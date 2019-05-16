@@ -690,45 +690,45 @@ func (c *Command) execute(s State, a []string) (chat tgbotapi.Chattable, err err
 		c.Printf("Command %q is deprecated, %s\n", c.Name(), c.Deprecated)
 	}
 
-	// initialize help and version flag at the last point possible to allow for user
-	// overriding
-	c.InitDefaultHelpFlag()
-	c.InitDefaultVersionFlag()
+	// // initialize help and version flag at the last point possible to allow for user
+	// // overriding
+	// c.InitDefaultHelpFlag()
+	// c.InitDefaultVersionFlag()
 
 	err = c.ParseFlags(a)
 	if err != nil {
 		return nil, c.FlagErrorFunc()(c, err)
 	}
 
-	// If help is called, regardless of other flags, return we want help.
-	// Also say we need help if the command isn't runnable.
-	helpVal, err := c.Flags().GetBool("help")
-	if err != nil {
-		// should be impossible to get here as we always declare a help
-		// flag in InitDefaultHelpFlag()
-		c.Println("\"help\" flag declared as non-bool. Please correct your code")
-		return nil, err
-	}
+	// // If help is called, regardless of other flags, return we want help.
+	// // Also say we need help if the command isn't runnable.
+	// helpVal, err := c.Flags().GetBool("help")
+	// if err != nil {
+	// 	// should be impossible to get here as we always declare a help
+	// 	// flag in InitDefaultHelpFlag()
+	// 	c.Println("\"help\" flag declared as non-bool. Please correct your code")
+	// 	return nil, err
+	// }
 
-	if helpVal {
-		return nil, flag.ErrHelp
-	}
+	// if helpVal {
+	// 	return nil, flag.ErrHelp
+	// }
 
-	// for back-compat, only add version flag behavior if version is defined
-	if c.Version != "" {
-		versionVal, err := c.Flags().GetBool("version")
-		if err != nil {
-			c.Println("\"version\" flag declared as non-bool. Please correct your code")
-			return nil, err
-		}
-		if versionVal {
-			err := tmpl(c.OutOrStdout(), c.VersionTemplate(), c)
-			if err != nil {
-				c.Println(err)
-			}
-			return nil, err
-		}
-	}
+	// // for back-compat, only add version flag behavior if version is defined
+	// if c.Version != "" {
+	// 	versionVal, err := c.Flags().GetBool("version")
+	// 	if err != nil {
+	// 		c.Println("\"version\" flag declared as non-bool. Please correct your code")
+	// 		return nil, err
+	// 	}
+	// 	if versionVal {
+	// 		err := tmpl(c.OutOrStdout(), c.VersionTemplate(), c)
+	// 		if err != nil {
+	// 			c.Println(err)
+	// 		}
+	// 		return nil, err
+	// 	}
+	// }
 
 	if !c.Runnable() {
 		return nil, flag.ErrHelp
@@ -822,9 +822,9 @@ func (c *Command) ExecuteC(s State) (cmd *Command, chat tgbotapi.Chattable, err 
 		preExecHookFn(c)
 	}
 
-	// initialize help as the last point possible to allow for user
-	// overriding
-	c.InitDefaultHelpCmd()
+	// // initialize help as the last point possible to allow for user
+	// // overriding
+	// c.InitDefaultHelpCmd()
 
 	args := c.args
 
@@ -848,7 +848,7 @@ func (c *Command) ExecuteC(s State) (cmd *Command, chat tgbotapi.Chattable, err 
 		}
 		if !c.SilenceErrors {
 			c.Println("Error:", err.Error())
-			c.Printf("Run '%v --help' for usage.\n", c.CommandPath())
+			// c.Printf("Run '%v --help' for usage.\n", c.CommandPath())
 		}
 		return c, nil, err
 	}
