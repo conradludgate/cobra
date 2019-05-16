@@ -25,7 +25,7 @@ func executeCommandC(root *Command, args ...string) (c *Command, output string, 
 	root.SetOutput(buf)
 	root.SetArgs(args)
 
-	c, _, err = root.ExecuteC(State{nil, nil})
+	c, _, err = root.ExecuteC(State{})
 
 	return c, buf.String(), err
 }
@@ -1602,7 +1602,7 @@ func (tc *calledAsTestcase) test(t *testing.T) {
 	output := new(bytes.Buffer)
 	parent.SetOutput(output)
 
-	parent.Execute(State{nil, nil})
+	parent.Execute(State{})
 
 	if called == nil {
 		if tc.call != "" {

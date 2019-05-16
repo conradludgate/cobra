@@ -32,6 +32,7 @@ import (
 
 type State struct {
 	DB  *gorm.DB
+	Me  *tgbotapi.User
 	Msg *tgbotapi.Message
 }
 
