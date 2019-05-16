@@ -20,12 +20,20 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	flag "github.com/spf13/pflag"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+
+	"github.com/jinzhu/gorm"
 )
+
+type State struct {
+	DB  *gorm.DB
+	Msg *tgbotapi.Message
+}
 
 // FParseErrWhitelist configures Flag parse errors to be ignored
 type FParseErrWhitelist flag.ParseErrorsWhitelist
@@ -100,7 +108,7 @@ type Command struct {
 	// PreRunE: PreRun but returns an error.
 	PreRunE func(cmd *Command, args []string) error
 	// Run: Typically the actual work function. Most commands will only implement this.
-	Run func(cmd *Command, args []string)
+	Run func(s State, cmd *Command, args []string) tgbotapi.Chattable
 	// RunE: Run but returns an error.
 	RunE func(cmd *Command, args []string) error
 	// PostRun: run after the Run command.
@@ -672,9 +680,9 @@ func (c *Command) ArgsLenAtDash() int {
 	return c.Flags().ArgsLenAtDash()
 }
 
-func (c *Command) execute(a []string) (err error) {
+func (c *Command) execute(s State, a []string) (chat tgbotapi.Chattable, err error) {
 	if c == nil {
-		return fmt.Errorf("Called Execute() on a nil Command")
+		return nil, fmt.Errorf("Called Execute() on a nil Command")
 	}
 
 	if len(c.Deprecated) > 0 {
@@ -688,7 +696,7 @@ func (c *Command) execute(a []string) (err error) {
 
 	err = c.ParseFlags(a)
 	if err != nil {
-		return c.FlagErrorFunc()(c, err)
+		return nil, c.FlagErrorFunc()(c, err)
 	}
 
 	// If help is called, regardless of other flags, return we want help.
@@ -698,11 +706,11 @@ func (c *Command) execute(a []string) (err error) {
 		// should be impossible to get here as we always declare a help
 		// flag in InitDefaultHelpFlag()
 		c.Println("\"help\" flag declared as non-bool. Please correct your code")
-		return err
+		return nil, err
 	}
 
 	if helpVal {
-		return flag.ErrHelp
+		return nil, flag.ErrHelp
 	}
 
 	// for back-compat, only add version flag behavior if version is defined
@@ -710,19 +718,19 @@ func (c *Command) execute(a []string) (err error) {
 		versionVal, err := c.Flags().GetBool("version")
 		if err != nil {
 			c.Println("\"version\" flag declared as non-bool. Please correct your code")
-			return err
+			return nil, err
 		}
 		if versionVal {
 			err := tmpl(c.OutOrStdout(), c.VersionTemplate(), c)
 			if err != nil {
 				c.Println(err)
 			}
-			return err
+			return nil, err
 		}
 	}
 
 	if !c.Runnable() {
-		return flag.ErrHelp
+		return nil, flag.ErrHelp
 	}
 
 	c.preRun()
@@ -733,13 +741,13 @@ func (c *Command) execute(a []string) (err error) {
 	}
 
 	if err := c.ValidateArgs(argWoFlags); err != nil {
-		return err
+		return nil, err
 	}
 
 	for p := c; p != nil; p = p.Parent() {
 		if p.PersistentPreRunE != nil {
 			if err := p.PersistentPreRunE(c, argWoFlags); err != nil {
-				return err
+				return nil, err
 			}
 			break
 		} else if p.PersistentPreRun != nil {
@@ -749,25 +757,25 @@ func (c *Command) execute(a []string) (err error) {
 	}
 	if c.PreRunE != nil {
 		if err := c.PreRunE(c, argWoFlags); err != nil {
-			return err
+			return nil, err
 		}
 	} else if c.PreRun != nil {
 		c.PreRun(c, argWoFlags)
 	}
 
 	if err := c.validateRequiredFlags(); err != nil {
-		return err
+		return nil, err
 	}
 	if c.RunE != nil {
 		if err := c.RunE(c, argWoFlags); err != nil {
-			return err
+			return nil, err
 		}
 	} else {
-		c.Run(c, argWoFlags)
+		chat = c.Run(s, c, argWoFlags)
 	}
 	if c.PostRunE != nil {
 		if err := c.PostRunE(c, argWoFlags); err != nil {
-			return err
+			return nil, err
 		}
 	} else if c.PostRun != nil {
 		c.PostRun(c, argWoFlags)
@@ -775,7 +783,7 @@ func (c *Command) execute(a []string) (err error) {
 	for p := c; p != nil; p = p.Parent() {
 		if p.PersistentPostRunE != nil {
 			if err := p.PersistentPostRunE(c, argWoFlags); err != nil {
-				return err
+				return nil, err
 			}
 			break
 		} else if p.PersistentPostRun != nil {
@@ -784,7 +792,7 @@ func (c *Command) execute(a []string) (err error) {
 		}
 	}
 
-	return nil
+	return chat, nil
 }
 
 func (c *Command) preRun() {
@@ -796,16 +804,16 @@ func (c *Command) preRun() {
 // Execute uses the args (os.Args[1:] by default)
 // and run through the command tree finding appropriate matches
 // for commands and then corresponding flags.
-func (c *Command) Execute() error {
-	_, err := c.ExecuteC()
-	return err
+func (c *Command) Execute(s State) (tgbotapi.Chattable, error) {
+	_, chat, err := c.ExecuteC(s)
+	return chat, err
 }
 
 // ExecuteC executes the command.
-func (c *Command) ExecuteC() (cmd *Command, err error) {
+func (c *Command) ExecuteC(s State) (cmd *Command, chat tgbotapi.Chattable, err error) {
 	// Regardless of what command execute is called on, run on Root only
 	if c.HasParent() {
-		return c.Root().ExecuteC()
+		return c.Root().ExecuteC(s)
 	}
 
 	// windows hook
@@ -820,8 +828,10 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	args := c.args
 
 	// Workaround FAIL with "go test -v" or "cobra.test -test.v", see #155
-	if c.args == nil && filepath.Base(os.Args[0]) != "cobra.test" {
-		args = os.Args[1:]
+	if c.args == nil {
+		if s.Msg != nil {
+			args = strings.Split(s.Msg.Text, " ")
+		}
 	}
 
 	var flags []string
@@ -839,7 +849,7 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 			c.Println("Error:", err.Error())
 			c.Printf("Run '%v --help' for usage.\n", c.CommandPath())
 		}
-		return c, err
+		return c, nil, err
 	}
 
 	cmd.commandCalledAs.called = true
@@ -847,13 +857,13 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 		cmd.commandCalledAs.name = cmd.Name()
 	}
 
-	err = cmd.execute(flags)
+	chat, err = cmd.execute(s, flags)
 	if err != nil {
 		// Always show help if requested, even if SilenceErrors is in
 		// effect
 		if err == flag.ErrHelp {
 			cmd.HelpFunc()(cmd, args)
-			return cmd, nil
+			return cmd, nil, nil
 		}
 
 		// If root command has SilentErrors flagged,
@@ -868,7 +878,7 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 			c.Println(cmd.UsageString())
 		}
 	}
-	return cmd, err
+	return cmd, chat, err
 }
 
 func (c *Command) ValidateArgs(args []string) error {
@@ -949,7 +959,7 @@ func (c *Command) InitDefaultHelpCmd() {
 			Long: `Help provides help for any command in the application.
 Simply type ` + c.Name() + ` help [path to command] for full details.`,
 
-			Run: func(c *Command, args []string) {
+			Run: func(_ State, c *Command, args []string) tgbotapi.Chattable {
 				cmd, _, e := c.Root().Find(args)
 				if cmd == nil || e != nil {
 					c.Printf("Unknown help topic %#q\n", args)
@@ -958,6 +968,7 @@ Simply type ` + c.Name() + ` help [path to command] for full details.`,
 					cmd.InitDefaultHelpFlag() // make possible 'help' flag to be shown
 					cmd.Help()
 				}
+				return nil
 			},
 		}
 	}

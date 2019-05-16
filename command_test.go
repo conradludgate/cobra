@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
-func emptyRun(*Command, []string) {}
+func emptyRun(State, *Command, []string) tgbotapi.Chattable { return nil }
 
 func executeCommand(root *Command, args ...string) (output string, err error) {
 	_, output, err = executeCommandC(root, args...)
@@ -23,7 +25,7 @@ func executeCommandC(root *Command, args ...string) (c *Command, output string, 
 	root.SetOutput(buf)
 	root.SetArgs(args)
 
-	c, err = root.ExecuteC()
+	c, _, err = root.ExecuteC(State{nil, nil})
 
 	return c, buf.String(), err
 }
@@ -49,7 +51,7 @@ func TestSingleCommand(t *testing.T) {
 	rootCmd := &Command{
 		Use:  "root",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { rootCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { rootCmdArgs = args; return nil },
 	}
 	aCmd := &Command{Use: "a", Args: NoArgs, Run: emptyRun}
 	bCmd := &Command{Use: "b", Args: NoArgs, Run: emptyRun}
@@ -76,7 +78,7 @@ func TestChildCommand(t *testing.T) {
 	child1Cmd := &Command{
 		Use:  "child1",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { child1CmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { child1CmdArgs = args; return nil },
 	}
 	child2Cmd := &Command{Use: "child2", Args: NoArgs, Run: emptyRun}
 	rootCmd.AddCommand(child1Cmd, child2Cmd)
@@ -159,7 +161,7 @@ func TestCommandAlias(t *testing.T) {
 	timesCmd := &Command{
 		Use:  "times",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { timesCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { timesCmdArgs = args; return nil },
 	}
 	echoCmd.AddCommand(timesCmd)
 	rootCmd.AddCommand(echoCmd)
@@ -187,7 +189,7 @@ func TestEnablePrefixMatching(t *testing.T) {
 	aCmd := &Command{
 		Use:  "aCmd",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { aCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { aCmdArgs = args; return nil },
 	}
 	bCmd := &Command{Use: "bCmd", Args: NoArgs, Run: emptyRun}
 	rootCmd.AddCommand(aCmd, bCmd)
@@ -223,7 +225,7 @@ func TestAliasPrefixMatching(t *testing.T) {
 	timesCmd := &Command{
 		Use:  "times",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { timesCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { timesCmdArgs = args; return nil },
 	}
 	echoCmd.AddCommand(timesCmd)
 	rootCmd.AddCommand(echoCmd)
@@ -254,7 +256,7 @@ func TestChildSameName(t *testing.T) {
 	fooCmd := &Command{
 		Use:  "foo",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { fooCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { fooCmdArgs = args; return nil },
 	}
 	barCmd := &Command{Use: "bar", Args: NoArgs, Run: emptyRun}
 	rootCmd.AddCommand(fooCmd, barCmd)
@@ -284,7 +286,7 @@ func TestGrandChildSameName(t *testing.T) {
 	fooCmd := &Command{
 		Use:  "foo",
 		Args: ExactArgs(2),
-		Run:  func(_ *Command, args []string) { fooCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { fooCmdArgs = args; return nil },
 	}
 	barCmd.AddCommand(fooCmd)
 	rootCmd.AddCommand(barCmd)
@@ -309,7 +311,7 @@ func TestFlagLong(t *testing.T) {
 	c := &Command{
 		Use:  "c",
 		Args: ArbitraryArgs,
-		Run:  func(_ *Command, args []string) { cArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { cArgs = args; return nil },
 	}
 
 	var intFlagValue int
@@ -347,7 +349,7 @@ func TestFlagShort(t *testing.T) {
 	c := &Command{
 		Use:  "c",
 		Args: ArbitraryArgs,
-		Run:  func(_ *Command, args []string) { cArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { cArgs = args; return nil },
 	}
 
 	var intFlagValue int
@@ -536,8 +538,9 @@ func TestDisableFlagParsing(t *testing.T) {
 	c := &Command{
 		Use:                "c",
 		DisableFlagParsing: true,
-		Run: func(_ *Command, args []string) {
+		Run: func(_ State, _ *Command, args []string) tgbotapi.Chattable {
 			cArgs = args
+			return nil
 		},
 	}
 
@@ -560,7 +563,7 @@ func TestPersistentFlagsOnSameCommand(t *testing.T) {
 	rootCmd := &Command{
 		Use:  "root",
 		Args: ArbitraryArgs,
-		Run:  func(_ *Command, args []string) { rootCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { rootCmdArgs = args; return nil },
 	}
 
 	var flagValue int
@@ -643,7 +646,7 @@ func TestPersistentFlagsOnChild(t *testing.T) {
 	childCmd := &Command{
 		Use:  "child",
 		Args: ArbitraryArgs,
-		Run:  func(_ *Command, args []string) { childCmdArgs = args },
+		Run:  func(_ State, _ *Command, args []string) tgbotapi.Chattable { childCmdArgs = args; return nil },
 	}
 	rootCmd.AddCommand(childCmd)
 
@@ -765,7 +768,7 @@ func TestSetHelpCommand(t *testing.T) {
 		Short: "Help about any command",
 		Long: `Help provides help for any command in the application.
 	Simply type ` + c.Name() + ` help [path to command] for full details.`,
-		Run: func(c *Command, _ []string) { c.Print(expected) },
+		Run: func(_ State, c *Command, _ []string) tgbotapi.Chattable { c.Print(expected); return nil },
 	})
 
 	got, err := executeCommand(c, "help")
@@ -807,9 +810,9 @@ func TestHelpFlagExecutedOnChild(t *testing.T) {
 // that has no other flags.
 // Related to https://github.com/spf13/cobra/issues/302.
 func TestHelpFlagInHelp(t *testing.T) {
-	parentCmd := &Command{Use: "parent", Run: func(*Command, []string) {}}
+	parentCmd := &Command{Use: "parent", Run: func(State, *Command, []string) tgbotapi.Chattable { return nil }}
 
-	childCmd := &Command{Use: "child", Run: func(*Command, []string) {}}
+	childCmd := &Command{Use: "child", Run: func(State, *Command, []string) tgbotapi.Chattable { return nil }}
 	parentCmd.AddCommand(childCmd)
 
 	output, err := executeCommand(parentCmd, "help", "child")
@@ -821,7 +824,7 @@ func TestHelpFlagInHelp(t *testing.T) {
 }
 
 func TestFlagsInUsage(t *testing.T) {
-	rootCmd := &Command{Use: "root", Args: NoArgs, Run: func(*Command, []string) {}}
+	rootCmd := &Command{Use: "root", Args: NoArgs, Run: func(State, *Command, []string) tgbotapi.Chattable { return nil }}
 	output, err := executeCommand(rootCmd, "--help")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -1004,11 +1007,11 @@ func TestReplaceCommandWithRemove(t *testing.T) {
 	rootCmd := &Command{Use: "root", Run: emptyRun}
 	child1Cmd := &Command{
 		Use: "child",
-		Run: func(*Command, []string) { childUsed = 1 },
+		Run: func(State, *Command, []string) tgbotapi.Chattable { childUsed = 1; return nil },
 	}
 	child2Cmd := &Command{
 		Use: "child",
-		Run: func(*Command, []string) { childUsed = 2 },
+		Run: func(State, *Command, []string) tgbotapi.Chattable { childUsed = 2; return nil },
 	}
 	rootCmd.AddCommand(child1Cmd)
 	rootCmd.RemoveCommand(child1Cmd)
@@ -1064,8 +1067,9 @@ func TestHooks(t *testing.T) {
 		PreRun: func(_ *Command, args []string) {
 			preArgs = strings.Join(args, " ")
 		},
-		Run: func(_ *Command, args []string) {
+		Run: func(_ State, _ *Command, args []string) tgbotapi.Chattable {
 			runArgs = strings.Join(args, " ")
+			return nil
 		},
 		PostRun: func(_ *Command, args []string) {
 			postArgs = strings.Join(args, " ")
@@ -1125,8 +1129,9 @@ func TestPersistentHooks(t *testing.T) {
 		PreRun: func(_ *Command, args []string) {
 			parentPreArgs = strings.Join(args, " ")
 		},
-		Run: func(_ *Command, args []string) {
+		Run: func(_ State, _ *Command, args []string) tgbotapi.Chattable {
 			parentRunArgs = strings.Join(args, " ")
+			return nil
 		},
 		PostRun: func(_ *Command, args []string) {
 			parentPostArgs = strings.Join(args, " ")
@@ -1144,8 +1149,9 @@ func TestPersistentHooks(t *testing.T) {
 		PreRun: func(_ *Command, args []string) {
 			childPreArgs = strings.Join(args, " ")
 		},
-		Run: func(_ *Command, args []string) {
+		Run: func(_ State, _ *Command, args []string) tgbotapi.Chattable {
 			childRunArgs = strings.Join(args, " ")
+			return nil
 		},
 		PostRun: func(_ *Command, args []string) {
 			childPostArgs = strings.Join(args, " ")
@@ -1306,7 +1312,7 @@ func TestHiddenCommandExecutes(t *testing.T) {
 	c := &Command{
 		Use:    "c",
 		Hidden: true,
-		Run:    func(*Command, []string) { executed = true },
+		Run:    func(State, *Command, []string) tgbotapi.Chattable { executed = true; return nil },
 	}
 
 	output, err := executeCommand(c)
@@ -1579,7 +1585,11 @@ func (tc *calledAsTestcase) test(t *testing.T) {
 	EnablePrefixMatching = tc.epm
 
 	var called *Command
-	run := func(c *Command, _ []string) { t.Logf("called: %q", c.Name()); called = c }
+	run := func(_ State, c *Command, _ []string) tgbotapi.Chattable {
+		t.Logf("called: %q", c.Name())
+		called = c
+		return nil
+	}
 
 	parent := &Command{Use: "parent", Run: run}
 	child1 := &Command{Use: "child1", Run: run, Aliases: []string{"this"}}
@@ -1592,7 +1602,7 @@ func (tc *calledAsTestcase) test(t *testing.T) {
 	output := new(bytes.Buffer)
 	parent.SetOutput(output)
 
-	parent.Execute()
+	parent.Execute(State{nil, nil})
 
 	if called == nil {
 		if tc.call != "" {
