@@ -831,7 +831,7 @@ func (c *Command) ExecuteC(s State) (cmd *Command, chat tgbotapi.Chattable, err 
 	// Workaround FAIL with "go test -v" or "cobra.test -test.v", see #155
 	if c.args == nil {
 		if s.Msg != nil {
-			args = strings.Split(s.Msg.Text, " ")
+			args = strings.Fields(s.Msg.Text)
 		}
 	}
 
