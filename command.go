@@ -31,9 +31,10 @@ import (
 )
 
 type State struct {
-	DB  *gorm.DB
-	Me  *tgbotapi.User
-	Msg *tgbotapi.Message
+	DB            *gorm.DB
+	Me, From      *tgbotapi.User
+	Chat          *tgbotapi.Chat
+	LinkedMessage int64
 }
 
 // FParseErrWhitelist configures Flag parse errors to be ignored
@@ -805,16 +806,16 @@ func (c *Command) preRun() {
 // Execute uses the args (os.Args[1:] by default)
 // and run through the command tree finding appropriate matches
 // for commands and then corresponding flags.
-func (c *Command) Execute(s State) (tgbotapi.Chattable, error) {
-	_, chat, err := c.ExecuteC(s)
+func (c *Command) Execute(s State, command string) (tgbotapi.Chattable, error) {
+	_, chat, err := c.ExecuteC(s, command)
 	return chat, err
 }
 
 // ExecuteC executes the command.
-func (c *Command) ExecuteC(s State) (cmd *Command, chat tgbotapi.Chattable, err error) {
+func (c *Command) ExecuteC(s State, command string) (cmd *Command, chat tgbotapi.Chattable, err error) {
 	// Regardless of what command execute is called on, run on Root only
 	if c.HasParent() {
-		return c.Root().ExecuteC(s)
+		return c.Root().ExecuteC(s, command)
 	}
 
 	// windows hook
@@ -828,11 +829,8 @@ func (c *Command) ExecuteC(s State) (cmd *Command, chat tgbotapi.Chattable, err 
 
 	args := c.args
 
-	// Workaround FAIL with "go test -v" or "cobra.test -test.v", see #155
 	if c.args == nil {
-		if s.Msg != nil {
-			args = strings.Fields(s.Msg.Text)
-		}
+		args = strings.Fields(command)
 	}
 
 	var flags []string
